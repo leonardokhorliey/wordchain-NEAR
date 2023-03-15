@@ -1,5 +1,5 @@
 [package]
-name = "wordchain"
+name = "wordchain-token"
 version = "0.1.0"
 edition = "2021"
 
