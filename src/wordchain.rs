@@ -1,9 +1,4 @@
 
-use std::collections::HashMap;
-
-use near_contract_standards::fungible_token::metadata::{
-    FungibleTokenMetadata, FungibleTokenMetadataProvider, FT_METADATA_SPEC,
-};
 use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LazyOption, LookupMap, Vector};
@@ -55,6 +50,7 @@ struct TournamentPlayer {
     account_id: AccountId,
     stake_amount: Balance,
     score: u64,
+    number_of_games_played: u64,
     join_date: u64
 }
 
@@ -168,6 +164,7 @@ impl Wordchain {
                         account_id: env::predecessor_account_id(),
                         stake_amount: minimum_stake.0,
                         score: 0,
+                        number_of_games_played: 0,
                         join_date: env::block_timestamp_ms(),
                     });
                 }
@@ -240,6 +237,7 @@ impl Wordchain {
                     account_id: env::predecessor_account_id(),
                     stake_amount: ft_stake,
                     score: 0,
+                    number_of_games_played: 0,
                     join_date: env::block_timestamp_ms(),
                 });
 
@@ -273,6 +271,7 @@ impl Wordchain {
         tournament.players.clone().into_iter().for_each(|mut player| {
             if player.account_id == env::predecessor_account_id() {
                 player.score += score as u64;
+                player.number_of_games_played += 1;
             }
         });
 
@@ -324,7 +323,7 @@ impl Wordchain {
 
                 let mut players = tournament.players.clone().into_iter().map(|player| player).collect::<Vec<TournamentPlayer>>();
 
-                players.sort_by(|a, b| b.score.cmp(&a.score));
+                players.sort_by(|a, b| ((b.score*1000)/b.number_of_games_played).cmp(&((a.score*1000)/a.number_of_games_played)));
 
                 let prizes = self.get_position_prizes();
 
