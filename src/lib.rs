@@ -1,3 +1,3 @@
-pub mod wordchain;
+mod wordchain;
 
 
