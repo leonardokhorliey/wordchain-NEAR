@@ -6,7 +6,7 @@ use near_contract_standards::fungible_token::FungibleToken;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::LazyOption;
 use near_sdk::json_types::U128;
-use near_sdk::{env, log, near_bindgen, AccountId, Balance, PanicOnDefault, BorshStorageKey, PromiseOrValue, require};
+use near_sdk::{env, log, near_bindgen, AccountId, Balance, PanicOnDefault, BorshStorageKey, PromiseOrValue, Promise, require};
 
 pub const TOTAL_SUPPLY: U128 = U128(100_000_000);
 
@@ -68,6 +68,11 @@ impl WordchainToken {
         this
     }
 
+    pub fn withdraw_near(&mut self, amount: U128) {
+        require!(env::predecessor_account_id() == self.owner);
+
+        Promise::new(env::predecessor_account_id()).transfer(amount.0);
+    }
 
     pub fn get_token_owner(&mut self) -> AccountId {
         self.owner.clone()
