@@ -101,7 +101,9 @@ impl Wordchain {
 
     #[init]
     pub fn new(percentage_stake_commission: u64, countries: String, min_tournament_players: u8) -> Self {
-
+        require!(min_tournament_players > 3, "Minimum number of players must be greater then 3");
+        require!(percentage_stake_commission > 1000, "Commission must be at least 10 percent");
+        require!(countries.replace("|", "").len() > 2, "Enter at least one valid country code.");
         let countries_split = countries.split("|").collect::<Vec<&str>>();
 
         let mut supported_countries = Vector::new(b"c");
@@ -142,8 +144,7 @@ impl Wordchain {
             _ => {}
         }
 
-        require!(self.get_tournament_by_key(tournament_key.clone()).is_none(), "Tournament with provided key already exists");
-        require!(self.get_tournament_by_name(name.clone()).is_none(), "Tournament with provided name already exists");
+        require!(self.get_tournament_by_key_or_name(tournament_key.clone(), name.clone()).is_none(), "Tournament with provided key or name already exists");
         require!(self.get_gametypes(Some(game_type_id.clone())).len() > 0, "No tournament with provided game type");
 
         if let Some(stakings) = Some(self.stakes.get(&env::predecessor_account_id())) {
@@ -368,10 +369,62 @@ impl Wordchain {
         self.paused = false;
     }
 
+    pub fn withdraw_value(&mut self, to: AccountId, ft_address: AccountId, amount: Option<U128>) -> Balance {
 
+        require!(self.owner == env::predecessor_account_id(), "Unauthorized");
+        let payout = self.stake_payouts.get(&ft_address).unwrap_or_default();
+        match amount {
+            Some(amt) => {
+                let mut bal: u128 = 0;
+                
+                if payout < amt.0 {
+                    env::panic_str("Confirm correct token address or withdraw amount below threshold");
+                } else {
+                    ext_token_contract::ext(ft_address.clone())
+                        .ft_transfer(
+                            &to,
+                            amt.0,
+                            None
+                        );
+                    
+                    bal = payout - amt.0
+                }
+                bal
 
+            },
+            None => {
+                ext_token_contract::ext(ft_address.clone())
+                    .ft_transfer(
+                        &to,
+                        payout,
+                        None
+                    );
 
+                0
+            }
+        }
+    }
 
+    pub fn add_supported_country(&mut self, countries: String) {
+        require!(self.owner == env::predecessor_account_id(), "Unauthorized");
+        let countries_split = countries.split("|");
+
+        for code in countries_split {
+            self.supported_countries.push(&code.to_string());
+        }
+    }
+
+    pub fn set_min_players(&mut self, num: u8) {
+        require!(self.owner == env::predecessor_account_id(), "Unauthorized");
+        require!(num > 3, "Minimum number of players must be greater then 3");
+        self.min_tournament_players = num;
+    }
+
+    pub fn set_percentage_stake_commission(&mut self, new_value: u64) {
+        require!(self.owner == env::predecessor_account_id(), "Unauthorized");
+        require!(new_value >= 1000, "Commission must be at least 10 percent");
+        self.percentage_stake_commission = new_value;
+    }
 
     // getters
     pub fn get_gametypes(&self, identifier: Option<String>) -> Vec<GameType> {
@@ -385,23 +438,11 @@ impl Wordchain {
 
     }
 
-    pub fn get_tournament_by_key(&self, tournament_key: String) -> Option<Tournament> {
+    pub fn get_tournament_by_key_or_name(&self, tournament_key: String, tournament_name: String) -> Option<Tournament> {
         let mut res = None;
 
         for tournament in self.tournaments.iter() {
-            if tournament.tournament_key == tournament_key {
-                res = Some(tournament);
-            }
-        }
-
-        res
-    }
-
-    pub fn get_tournament_by_name(&self, tournament_name: String) -> Option<Tournament> {
-        let mut res = None;
-
-        for tournament in self.tournaments.iter() {
-            if tournament.name == tournament_name {
+            if tournament.tournament_key == tournament_key || tournament.name == tournament_name {
                 res = Some(tournament);
             }
         }
